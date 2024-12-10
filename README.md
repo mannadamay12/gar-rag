@@ -151,5 +151,3 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - BEIR benchmark for evaluation datasets
 - Hugging Face for transformer models
 - Facebook Research for FAISS
-```
-
