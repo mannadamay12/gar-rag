@@ -1,60 +1,68 @@
-from enum import Enum
+# src/gar/strategies.py
+from abc import ABC, abstractmethod
 from typing import Dict, List
+from ..models.base_model import BaseLanguageModel
 
-class EnhancementStrategy(Enum):
-    BASIC = "basic"
-    DOMAIN_SPECIFIC = "domain_specific"
-    DIFFICULTY_BASED = "difficulty_based"
-    INTENT_FOCUSED = "intent_focused"
-
-class QueryEnhancementStrategies:
-    def __init__(self, model):
-        self.model = model
-        
-    def enhance_basic(self, query_info: Dict) -> str:
-        prompt = f"""
-        Enhance this search query while maintaining its core meaning:
-        {query_info['original_query']}
-        """
-        return self.model.generate(prompt)
-        
-    def enhance_domain_specific(self, query_info: Dict) -> str:
-        domain = self._detect_domain(query_info)
-        prompt = f"""
-        Enhance this query with domain-specific terminology for {domain}:
-        {query_info['original_query']}
-        """
-        return self.model.generate(prompt)
-        
-    def enhance_difficulty_based(self, query_info: Dict) -> str:
-        difficulty = query_info['difficulty']['difficulty_level']
-        if difficulty in ['difficult', 'very_difficult']:
-            return self._simplify_query(query_info)
-        else:
-            return self._expand_query(query_info)
-            
-    def enhance_intent_focused(self, query_info: Dict) -> str:
-        intent = query_info['intent']['primary'][0].value
-        prompt = f"""
-        Enhance this query focusing on the {intent} intent:
-        {query_info['original_query']}
-        """
-        return self.model.generate(prompt)
-
-    def _detect_domain(self, query_info: Dict) -> str:
-        # Implement domain detection logic
+class EnhancementStrategy(ABC):
+    @abstractmethod
+    def enhance(self, query_info: Dict, model: BaseLanguageModel) -> Dict:
+        """Enhance query using specific strategy"""
         pass
 
-    def _simplify_query(self, query_info: Dict) -> str:
+class SimpleExpansionStrategy(EnhancementStrategy):
+    def enhance(self, query_info: Dict, model: BaseLanguageModel) -> Dict:
+        """For simple queries - expand with synonyms and related terms"""
         prompt = f"""
-        Simplify this complex query while preserving its meaning:
-        {query_info['original_query']}
+        Enhance this simple search query with related terms:
+        Query: {query_info['original_query']}
+        
+        Provide:
+        1. Synonyms
+        2. Related terms
+        3. Common variations
         """
-        return self.model.generate(prompt)
+        enhanced = model.generate(prompt)
+        return {
+            'enhanced_query': enhanced,
+            'strategy': 'simple_expansion'
+        }
 
-    def _expand_query(self, query_info: Dict) -> str:
+class DomainSpecificStrategy(EnhancementStrategy):
+    def enhance(self, query_info: Dict, model: BaseLanguageModel) -> Dict:
+        """For domain-specific queries - add technical terms"""
+        entities = [e['text'] for e in query_info.get('entities', [])]
         prompt = f"""
-        Expand this query with relevant context and terminology:
-        {query_info['original_query']}
+        Enhance this domain-specific query with technical terms:
+        Query: {query_info['original_query']}
+        Entities: {', '.join(entities)}
+        
+        Include:
+        1. Technical terminology
+        2. Domain-specific concepts
+        3. Related technical terms
         """
-        return self.model.generate(prompt)
+        enhanced = model.generate(prompt)
+        return {
+            'enhanced_query': enhanced,
+            'strategy': 'domain_specific'
+        }
+
+class ComplexQueryStrategy(EnhancementStrategy):
+    def enhance(self, query_info: Dict, model: BaseLanguageModel) -> Dict:
+        """For complex queries - break down and expand"""
+        intent = query_info['intent']['primary'][0].value
+        prompt = f"""
+        Break down and enhance this complex query:
+        Query: {query_info['original_query']}
+        Intent: {intent}
+        
+        Provide:
+        1. Main concepts
+        2. Related aspects
+        3. Expanded search terms
+        """
+        enhanced = model.generate(prompt)
+        return {
+            'enhanced_query': enhanced,
+            'strategy': 'complex_breakdown'
+        }
