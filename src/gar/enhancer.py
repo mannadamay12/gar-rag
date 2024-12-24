@@ -16,10 +16,9 @@ from .strategies import (
 logger = setup_logger("gar_enhancer")
 
 class GAREnhancer:
-    def __init__(self):
+    def __init__(self, model_type: str = "flan-t5"):
         self.query_processor = QueryProcessor()
-        self.model = FlanT5Model()
-        self.templates = PromptTemplates()
+        self.model = self._get_model(model_type)
         self.strategies = {
             'easy': SimpleExpansionStrategy(),
             'moderate': DomainSpecificStrategy(),
