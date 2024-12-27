@@ -1,7 +1,5 @@
 from typing import Dict, List
-import math
 from collections import Counter
-import logging
 from ..utils.logger import setup_logger
 
 logger = setup_logger("difficulty_estimator")
@@ -63,45 +61,62 @@ class QueryDifficultyEstimator:
         # Normalize based on typical query lengths
         if token_count <= 2:
             return 0.2  # Very simple
+        elif token_count <= 3:
+            return 0.3  # Simple
         elif token_count <= 4:
-            return 0.4  # Simple
+            return 0.5  # Moderate
         elif token_count <= 6:
-            return 0.6  # Moderate
-        elif token_count <= 8:
-            return 0.8  # Complex
+            return 0.7  # Complex
         else:
             return 1.0  # Very complex
-
+        
     def _get_term_complexity(self, query_info: Dict) -> float:
-        """
-        Calculate complexity based on term characteristics
-        Consider POS tags, lemmas, etc.
-        """
+        """Calculate complexity based on term characteristics"""
         pos_tags = query_info.get('token_info', {}).get('pos_tags', [])
         
         if not pos_tags:
-            return 0.5  # Default if no POS info
+            return 0.5
             
         # Count different types of terms
         pos_counts = Counter(tag for _, tag in pos_tags)
         
-        # Calculate complexity based on POS diversity
-        noun_count = pos_counts.get('NN', 0) + pos_counts.get('NNP', 0)
-        verb_count = pos_counts.get('VB', 0) + pos_counts.get('VBP', 0)
-        adj_count = pos_counts.get('JJ', 0)
+        # Simple queries often have just nouns and maybe one verb
+        if len(pos_counts) <= 2 and ('NN' in pos_counts or 'NNP' in pos_counts):
+            return 0.3  # Lower complexity for simple noun phrases
+            
+        return min(1.0, len(set(pos_counts.keys())) / len(pos_tags))
+
+    # def _get_term_complexity(self, query_info: Dict) -> float:
+    #     """
+    #     Calculate complexity based on term characteristics
+    #     Consider POS tags, lemmas, etc.
+    #     """
+    #     pos_tags = query_info.get('token_info', {}).get('pos_tags', [])
         
-        # More diverse POS = more complex
-        pos_diversity = len(set(pos_counts.keys())) / len(pos_tags)
+    #     if not pos_tags:
+    #         return 0.5  # Default if no POS info
+            
+    #     # Count different types of terms
+    #     pos_counts = Counter(tag for _, tag in pos_tags)
         
-        # Normalize and combine factors
-        return min(1.0, (noun_count * 0.3 + verb_count * 0.3 + 
-                        adj_count * 0.2 + pos_diversity * 0.2))
+    #     # Calculate complexity based on POS diversity
+    #     noun_count = pos_counts.get('NN', 0) + pos_counts.get('NNP', 0)
+    #     verb_count = pos_counts.get('VB', 0) + pos_counts.get('VBP', 0)
+    #     adj_count = pos_counts.get('JJ', 0)
+        
+    #     # More diverse POS = more complex
+    #     pos_diversity = len(set(pos_counts.keys())) / len(pos_tags)
+        
+    #     # Normalize and combine factors
+    #     return min(1.0, (noun_count * 0.3 + verb_count * 0.3 + 
+    #                     adj_count * 0.2 + pos_diversity * 0.2))
 
     def _get_semantic_complexity(self, query_info: Dict) -> float:
         """
         Calculate complexity based on semantic features
         Consider entities, n-grams, etc.
         """
+        base_score = 0.3
         # Check for entities
         entities = query_info.get('entities', [])
         has_entities = len(entities) > 0

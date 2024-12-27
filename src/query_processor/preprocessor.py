@@ -1,4 +1,5 @@
-from typing import Dict
+from typing import Dict, List
+import re
 from .tokenizer import QueryTokenizer
 from .entity_recognizer import EntityRecognizer
 from .intent_classifier import IntentClassifier
@@ -13,6 +14,27 @@ class QueryProcessor:
         self.entity_recognizer = EntityRecognizer()
         self.intent_classifier = IntentClassifier()
         self.difficulty_estimator = QueryDifficultyEstimator()
+
+    def clean_query(self, query: str) -> str:
+        """Enhanced query cleaning"""
+        # Remove URLs
+        query = re.sub(r'http\S+|www.\S+', '', query)
+        
+        # Remove special characters but keep relevant search operators
+        query = re.sub(r'[^\w\s+-"]', ' ', query)
+        
+        # Handle common search operators
+        query = re.sub(r'\s+(?:AND|OR|NOT)\s+', lambda m: f' {m.group().strip()} ', query)
+        
+        # Normalize whitespace
+        query = re.sub(r'\s+', ' ', query).strip()
+        
+        return query.lower()
+
+    def remove_duplicates(self, tokens: List[str]) -> List[str]:
+        """Remove duplicate tokens while preserving order"""
+        seen = set()
+        return [t for t in tokens if not (t in seen or seen.add(t))]
 
     def process_query(self, query: str) -> Dict:
         """
