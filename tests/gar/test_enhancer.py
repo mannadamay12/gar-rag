@@ -6,15 +6,23 @@ from src.models.flan_t5 import FlanT5Model
 
 @pytest.fixture
 def mock_flan_t5():
-    model = Mock(spec=FlanT5Model)
-    model.generate.return_value = "Enhanced query about climate change including environmental impacts, global warming effects, and temperature rise"
-    return model
+    class MockModel:
+        def generate(self, prompt):
+            return f"Enhanced: {prompt.split('Query:')[1].strip()}"
+    
+    return MockModel()
 
 @pytest.fixture
 def enhancer(mock_flan_t5):
-    with patch('src.models.flan_t5.FlanT5Model', return_value=mock_flan_t5):
-        enhancer = GAREnhancer(model_type="flan-t5")
-        return enhancer
+    """Create enhancer with mock model"""
+    with patch('src.gar.enhancer.T5ForConditionalGeneration') as mock_model:
+        with patch('src.gar.enhancer.T5Tokenizer') as mock_tokenizer:
+            mock_model.return_value.generate.return_value = [0]  # Dummy token ID
+            mock_tokenizer.return_value.decode.return_value = "Enhanced query result"
+            enhancer = GAREnhancer(model_type="flan-t5")
+            # Replace the model with our mock
+            enhancer.model = mock_flan_t5
+            return enhancer
 
 def test_query_enhancement_basic(enhancer):
     """Test basic query enhancement using Flan-T5"""

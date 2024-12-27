@@ -2,6 +2,7 @@ from typing import Dict, List, Type
 from functools import lru_cache
 from transformers import T5ForConditionalGeneration, T5Tokenizer
 from ..query_processor.preprocessor import QueryProcessor
+from ..query_processor.tokenizer import QueryTokenizer
 from ..utils.logger import setup_logger
 from .strategies import (
     EnhancementStrategy,
@@ -18,6 +19,7 @@ logger = setup_logger("gar_enhancer")
 class GAREnhancer:
     def __init__(self, model_type: str = "flan-t5"):
         self.query_processor = QueryProcessor()
+        self.tokenizer = QueryTokenizer()
         self.model = self._get_model(model_type)
         self.enhancement_cache = {}
         self.strategies = {
@@ -36,16 +38,18 @@ class GAREnhancer:
         tokenizer = T5Tokenizer.from_pretrained(model_name)
         model = T5ForConditionalGeneration.from_pretrained(model_name)
         
-        # Return an object with generate method instead of a dict
-        return type('Model', (), {
-            'generate': lambda prompt: self._generate_text(prompt, model, tokenizer)
-        })()
+        class Model:
+            def __init__(self, tokenizer, model):
+                self.tokenizer = tokenizer
+                self.model = model
+                
+            def generate(self, prompt):
+                inputs = self.tokenizer(prompt, return_tensors="pt", max_length=512, truncation=True)
+                outputs = self.model.generate(**inputs, max_length=512)
+                return self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+        
+        return Model(tokenizer, model)
 
-    def _generate_text(self, prompt: str, model, tokenizer, max_length: int = 512):
-        """Helper method to generate text using T5"""
-        inputs = tokenizer(prompt, return_tensors="pt", max_length=max_length, truncation=True)
-        outputs = model.generate(**inputs, max_length=max_length)
-        return tokenizer.decode(outputs[0], skip_special_tokens=True)
 
     def _select_strategy(self, query_info: Dict) -> EnhancementStrategy:
         """Select appropriate strategy based on query analysis"""
@@ -63,6 +67,7 @@ class GAREnhancer:
             
         # Fall back to difficulty-based selection
         return self.strategies[query_info['difficulty']['difficulty_level']]
+    
     @lru_cache(maxsize=1000)    
     def enhance_query(self, query: str) -> Dict:
         """Enhanced query enhancement with caching and error handling"""
@@ -103,8 +108,8 @@ class GAREnhancer:
             return False
             
         # Check if enhancement maintains core meaning
-        original_tokens = set(self.query_processor.tokenize(original_query)['word_tokens'])
-        enhanced_tokens = set(self.query_processor.tokenize(enhanced_query)['word_tokens'])
+        original_tokens = set(self.tokenizer.tokenize(original_query)['word_tokens'])
+        enhanced_tokens = set(self.tokenizer.tokenize(enhanced_query)['word_tokens'])
         
         # At least 50% of original terms should be present
         overlap = len(original_tokens.intersection(enhanced_tokens))

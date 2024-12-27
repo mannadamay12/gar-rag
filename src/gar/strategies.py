@@ -22,9 +22,9 @@ class SimpleExpansionStrategy(EnhancementStrategy):
         2. Related terms
         3. Common variations
         """
-        enhanced = model.generate(prompt)
+        enhanced_text = model.generate(prompt)
         return {
-            'enhanced_query': enhanced,
+            'enhanced_query': enhanced_text,
             'strategy': 'simple_expansion'
         }
 
